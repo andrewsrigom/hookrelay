@@ -1,0 +1,62 @@
+{
+  "name": "hookrelay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reliable webhook delivery with a complete delivery history.",
+  "packageManager": "pnpm@10.32.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "dev:fresh": "tsx scripts/dev-fresh.ts",
+    "start": "tsx apps/server/main.ts",
+    "build": "tsx scripts/build.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "demo": "tsx scripts/demo.ts",
+    "test:flow": "tsx scripts/verify-flow.ts",
+    "test:integration": "tsx scripts/test-dynamodb.ts",
+    "cdk": "cdk --app \"pnpm exec tsx infra/app.ts\"",
+    "synth": "pnpm cdk synth --quiet",
+    "verify:synth": "tsx scripts/verify-synth.ts",
+    "local:setup": "tsx scripts/setup-local-tools.ts",
+    "aws:repair-outbox": "tsx scripts/repair-outbox.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
+    "@aws-sdk/client-sqs": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "@aws-sdk/util-dynamodb": "^3.0.0",
+    "ipaddr.js": "^2.2.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "aws-cdk": "^2.0.0",
+    "aws-cdk-lib": "^2.0.0",
+    "constructs": "^10.0.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^10.10.0",
+    "prettier": "^3.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0"
+  }
+}
