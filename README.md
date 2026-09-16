@@ -80,6 +80,10 @@ pnpm test:integration
 
 Start with the [system walkthrough](docs/system-walkthrough.md) to connect the local order flow to the code and AWS services. The [HTTP API](docs/api.md) documents request and signature formats.
 
+## Repository safety
+
+Runtime secrets, local data, AWS CLI files, CDK context, and generated deployment artifacts are excluded from Git. Keep account-specific values in your shell or AWS config, and use placeholders in committed documentation. If a credential is ever committed, revoke or rotate it before cleaning the Git history.
+
 ## Current scope
 
-This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend is defined and can be synthesized, but no AWS resources have been deployed. The dashboard is hosted locally; cloud frontend hosting is a separate step. Managed SQS, Streams, Secrets Manager, IAM, and CloudWatch behavior still needs an AWS integration run.
+This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend is defined and can be synthesized, but no AWS resources have been deployed. The dashboard is hosted locally; cloud frontend hosting is a separate step. Managed SQS, Streams, Secrets Manager, IAM, and CloudWatch behavior still needs an AWS integration run. Development deployments delete their table and secrets with the stack; `stage=production` retains them and enables deletion protection.

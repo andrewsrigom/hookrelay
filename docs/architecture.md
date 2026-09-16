@@ -89,7 +89,7 @@ The local test receiver commits one `RECEIVER_EFFECT` record per delivery ID bef
 - Public recipients must use HTTPS/443. DNS is revalidated on each attempt; all returned addresses must be public. The socket connects to the validated IP with TLS hostname verification. Redirects are not followed.
 - The exact loopback receiver exception exists only in the local runtime.
 - Payload limit: 32 KB. Twenty endpoints keep event fan-out within one DynamoDB transaction.
-- Retention cleanup and multitenant quotas are not implemented. Data and both secrets are retained when the CDK stack is removed; see the runbook.
+- Retention cleanup and multitenant quotas are not implemented. Development removes data and secrets with the stack. Production retains them and enables DynamoDB deletion protection; see the runbook.
 
 ## References
 

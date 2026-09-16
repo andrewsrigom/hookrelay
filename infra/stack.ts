@@ -4,6 +4,7 @@ import {
   Duration,
   RemovalPolicy,
   CfnOutput,
+  Tags,
   aws_dynamodb as dynamodb,
   aws_sqs as sqs,
   aws_lambda as lambda,
@@ -19,17 +20,27 @@ import {
 import type { Construct } from 'constructs';
 import { policy } from '../packages/core/policy.js';
 
+export interface HookRelayStackProps extends StackProps {
+  deploymentStage: 'dev' | 'production';
+}
+
 export class HookRelayStack extends Stack {
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props: HookRelayStackProps) {
     super(scope, id, props);
+    const retainData = props.deploymentStage === 'production';
+    const dataRemovalPolicy = retainData ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
+    Tags.of(this).add('Project', 'HookRelay');
+    Tags.of(this).add('Environment', props.deploymentStage);
+
     const table = new dynamodb.Table(this, 'State', {
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: retainData },
+      deletionProtection: retainData,
       stream: dynamodb.StreamViewType.NEW_IMAGE,
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: dataRemovalPolicy,
     });
     table.addGlobalSecondaryIndex({
       indexName: 'by-created',
@@ -59,9 +70,9 @@ export class HookRelayStack extends Stack {
     const apiKey = new secrets.Secret(this, 'ApiKey', {
       generateSecretString: { passwordLength: 48, excludePunctuation: true },
     });
-    // Retain encryption material with the retained data table. Rotation requires ciphertext migration.
-    masterKey.applyRemovalPolicy(RemovalPolicy.RETAIN);
-    apiKey.applyRemovalPolicy(RemovalPolicy.RETAIN);
+    // Production retains encryption material with its data. Development is disposable.
+    masterKey.applyRemovalPolicy(dataRemovalPolicy);
+    apiKey.applyRemovalPolicy(dataRemovalPolicy);
     const createFunction = (
       name: string,
       entry: string,
@@ -187,6 +198,7 @@ export class HookRelayStack extends Stack {
       evaluationPeriods: 1,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
     });
+    new CfnOutput(this, 'DeploymentStage', { value: props.deploymentStage });
     new CfnOutput(this, 'ApiUrl', { value: httpApi.apiEndpoint });
     new CfnOutput(this, 'TableName', { value: table.tableName });
     new CfnOutput(this, 'ApiKeyArn', { value: apiKey.secretArn });

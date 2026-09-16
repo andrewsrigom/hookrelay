@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, Check, Clock3, RotateCw, X } from 'lucide-react';
+import { ArrowUpRight, Check, Clock3, RotateCw, TriangleAlert, X } from 'lucide-react';
 import type { Delivery } from '../../../../packages/core/model.js';
 import { api, message, type DeliveryDetail as Detail } from '../api.js';
 import { Modal, StatusBadge, dateTime, time } from './ui.js';
@@ -16,6 +16,7 @@ export function DeliveryDetail({
   const [data, setData] = useState<Detail>();
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const [confirmReplay, setConfirmReplay] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     let busy = false;
@@ -158,20 +159,37 @@ export function DeliveryDetail({
           <pre className="payload-view" tabIndex={0}>
             {JSON.stringify(data.payload, null, 2)}
           </pre>
-          <div className="form-actions">
-            <button className="secondary-button" onClick={onClose} disabled={pending}>
-              Close
+          <div className="form-actions detail-actions">
+            {data.delivery.status === 'failed' && confirmReplay ? (
+              <div className="form-summary warning replay-warning" role="alert">
+                <TriangleAlert size={17} />
+                <span>
+                  <strong>Replay this delivery?</strong> A replay creates a new delivery and may
+                  repeat the downstream action.
+                </span>
+              </div>
+            ) : null}
+            <button
+              className="secondary-button"
+              onClick={confirmReplay ? () => setConfirmReplay(false) : onClose}
+              disabled={pending}
+            >
+              {confirmReplay ? 'Cancel' : 'Close'}
             </button>
             {data.delivery.status === 'failed' ? (
               <button
                 className="primary-button"
                 disabled={pending}
                 onClick={() => {
-                  void replay();
+                  if (confirmReplay) {
+                    void replay();
+                  } else {
+                    setConfirmReplay(true);
+                  }
                 }}
               >
                 <RotateCw size={16} />
-                {pending ? 'Replaying…' : 'Replay delivery'}
+                {pending ? 'Replaying…' : confirmReplay ? 'Confirm replay' : 'Replay delivery'}
               </button>
             ) : null}
           </div>

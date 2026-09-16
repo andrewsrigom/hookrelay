@@ -1,7 +1,14 @@
 node_modules/
 dist/
 cdk.out/
+cdk.context.json
 .local/
 .env
+.env.*
+!.env.example
+.aws/
+.secrets/
+*.pem
+*.key
 *.log
 coverage/

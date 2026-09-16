@@ -88,7 +88,7 @@ export function DeliveryTable({
                       {delivery.eventType}
                     </button>
                     <span className="mono table-id">{shortId(delivery.id)}</span>
-                    <span className="mobile-status" aria-hidden="true">
+                    <span className="mobile-status">
                       <StatusBadge status={delivery.status} />
                     </span>
                   </td>
