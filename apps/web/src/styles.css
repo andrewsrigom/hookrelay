@@ -1534,10 +1534,6 @@ tbody tr:hover {
     padding-top: 44px;
   }
 
-  .overview-grid {
-    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
-  }
-
   .activity-chart {
     height: 180px;
   }
@@ -1590,11 +1586,6 @@ tbody tr:hover {
 
   .stat-note {
     font-size: 11px;
-  }
-
-  .overview-grid {
-    grid-template-columns: 1.4fr 1fr;
-    gap: 16px;
   }
 
   .endpoint-grid,
