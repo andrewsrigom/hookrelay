@@ -81,13 +81,17 @@ pnpm aws:smoke
 
 The command publishes synthetic data, follows the matching delivery for up to two minutes, and never prints the API key or signing secret.
 
-To validate the managed path without an external receiver, run:
+The development stack includes a separate HTTPS validation receiver. It has its own API Gateway, Lambda, signing secret, and seven-day logs. These resources are omitted from production and are deleted with the development stack.
+
+Run the complete cloud acceptance check with:
 
 ```bash
 AWS_PROFILE=hookrelay pnpm aws:validate
 ```
 
-This command loads the API key into memory, checks the authentication boundary, creates or reuses a paused validation endpoint, and publishes one synthetic event. The endpoint targets HookRelay's protected overview route, so the expected HTTP 401 proves that DynamoDB Streams, the dispatcher, SQS, the worker, outbound HTTPS, and terminal delivery recording all ran. It removes only terminal queue messages whose delivery belongs to a synthetic validation event, then pauses the endpoint before it exits. The operator identity therefore needs Secrets Manager read access for the API key and receive/delete access to the output failure queue.
+The command loads secrets into memory and never prints them. It validates the authentication boundary and then exercises three delivery outcomes: a controlled terminal 401, a signed HTTPS delivery accepted on the first attempt, and a signed delivery that recovers from 503 to 200. The terminal queue message is removed only after its delivery is confirmed as synthetic. Both validation endpoints are paused before exit.
+
+The operator identity needs read access to the API and validation-receiver secrets, plus receive/delete access to the development failed-delivery queue. The extra development API, Lambda, logs, and secret can generate charges while the stack exists.
 
 ## Cloud acceptance checks
 

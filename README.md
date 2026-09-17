@@ -57,6 +57,8 @@ pnpm verify:synth
 AWS_PROFILE=hookrelay pnpm aws:validate
 ```
 
+Use the [AWS console lab](docs/aws-console-lab.md) to trace the validation events through CloudFormation, Lambda, DynamoDB, SQS, and CloudWatch.
+
 Optional DynamoDB SDK integration on **Linux x64** requires `tar` and network access for the first setup:
 
 ```bash
@@ -89,4 +91,4 @@ Runtime secrets, local data, AWS CLI files, CDK context, and generated deploymen
 
 ## Current scope
 
-This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend has been deployed and its managed delivery path validated in a development account. The dashboard is hosted locally; cloud frontend hosting is a separate step. An independently hosted signed receiver, DLQ redrive, and alarm state transitions still need cloud acceptance runs. Development deployments delete their table and secrets with the stack; `stage=production` retains them and enables deletion protection.
+This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend and a development-only signed receiver have been deployed and validated in a development account, including first-attempt success and recovery from 503 to 200. The dashboard is hosted locally; cloud frontend hosting is a separate step. Recipient systems owned outside this stack, DLQ redrive, and infrastructure-failure recovery still need cloud acceptance runs. Development deployments delete their table and secrets with the stack; `stage=production` retains them and enables deletion protection.

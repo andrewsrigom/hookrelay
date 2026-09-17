@@ -115,6 +115,7 @@ export class DeliveryWorker {
         'Webhook-Id': current.id,
         'Webhook-Event-Id': event.id,
         'Webhook-Endpoint-Id': endpoint.id,
+        'Webhook-Attempt': String(current.attemptCount + 1),
         'Webhook-Timestamp': timestamp,
         'Webhook-Signature': signWebhook(secret, timestamp, current.id, body),
       });

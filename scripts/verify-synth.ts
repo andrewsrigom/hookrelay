@@ -15,7 +15,7 @@ const template = JSON.parse(await readFile('cdk.out/HookRelay.template.json', 'u
 
 const resources = Object.values(template.Resources);
 
-assert.equal(resources.filter((r) => r.Type === 'AWS::Lambda::Function').length, 3);
+assert.equal(resources.filter((r) => r.Type === 'AWS::Lambda::Function').length, 4);
 
 assert.equal(resources.filter((r) => r.Type === 'AWS::SQS::Queue').length, 4);
 
@@ -26,12 +26,16 @@ assert(
 );
 
 const secrets = resources.filter((r) => r.Type === 'AWS::SecretsManager::Secret');
-assert.equal(secrets.length, 2);
+assert.equal(secrets.length, 3);
 assert(secrets.every((secret) => secret.DeletionPolicy === 'Delete'));
 assert(secrets.every((secret) => secret.UpdateReplacePolicy === 'Delete'));
 assert.deepEqual(
   new Set(secrets.map((secret) => secret.Properties?.['Name'])),
-  new Set(['HookRelay-dev/api-key', 'HookRelay-dev/signing-encryption-key']),
+  new Set([
+    'HookRelay-dev/api-key',
+    'HookRelay-dev/signing-encryption-key',
+    'HookRelay-dev/validation-receiver-signing-key',
+  ]),
 );
 
 const table = resources.find((r) => r.Type === 'AWS::DynamoDB::Table');
@@ -55,7 +59,7 @@ assert(mappings.every((r) => JSON.stringify(r.Properties).includes('ReportBatchI
 
 const logGroups = resources.filter((r) => r.Type === 'AWS::Logs::LogGroup');
 
-assert.equal(logGroups.length, 4);
+assert.equal(logGroups.length, 6);
 assert(logGroups.every((logGroup) => logGroup.DeletionPolicy === 'Delete'));
 assert(logGroups.every((logGroup) => logGroup.UpdateReplacePolicy === 'Delete'));
 assert(logGroups.every((logGroup) => logGroup.Properties?.['RetentionInDays'] === 7));
@@ -68,6 +72,7 @@ const unexpectedCostResources = new Set([
 ]);
 
 assert(resources.every((resource) => !unexpectedCostResources.has(resource.Type)));
+assert.equal(resources.filter((resource) => resource.Type === 'AWS::ApiGatewayV2::Api').length, 2);
 
 assert(JSON.stringify(table.Properties).includes('NEW_IMAGE'));
 assert.equal(template.Outputs['DeploymentStage']?.Value, 'dev');
@@ -86,5 +91,5 @@ for (const resource of resources.filter((r) => r.Type === 'AWS::IAM::Policy')) {
 }
 
 console.log(
-  'Verified: disposable dev data and logs, 3 Lambdas, 4 encrypted queues, stream outbox, partial failures, 2 secrets, on-demand DynamoDB, scoped IAM actions, and no high-cost network or database resources.',
+  'Verified: disposable dev data and logs, 4 Lambdas, 2 HTTP APIs, 4 encrypted queues, stream outbox, partial failures, 3 secrets, on-demand DynamoDB, scoped IAM actions, and no high-cost network or database resources.',
 );

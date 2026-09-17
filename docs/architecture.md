@@ -41,6 +41,8 @@ flowchart LR
   Stream -. exhausted dispatch .-> OutboxDLQ[Outbox failure queue]
 ```
 
+Development also creates a separate HTTP API and Lambda receiver that verifies HMAC signatures and produces deterministic 200 and 503 responses for cloud acceptance. It has its own signing secret and is omitted from production.
+
 The API never makes a separate database-write/queue-publish pair. A single DynamoDB transaction commits the event, each delivery, and its first outbox job. Each delivery completion atomically records the attempt, the updated state, and, when needed, its next outbox job. Stream retries can duplicate SQS messages; the delivery ID and expected attempt number make old jobs safe to acknowledge.
 
 Records use `pk = kind`, `sk = id`. The `by-created` index orders recent records. Dashboard queries are explicitly bounded to 200 deliveries and 100 events. Endpoint routing queries use a **strongly consistent primary-index read**, so a newly registered endpoint does not have to wait for index propagation. A versioned endpoint counter enforces the 20-endpoint bound across concurrent registrations.
@@ -84,7 +86,7 @@ The local test receiver commits one `RECEIVER_EFFECT` record per delivery ID bef
 
 - Local servers bind to loopback. The API validates Host and Origin and requires JSON for mutations. Local access is trusted to the workstation user.
 - AWS API routes require a shared bearer API key. This is a single-workspace operator model, not per-user authorization.
-- Two Secrets Manager secrets separate API access from encryption of endpoint signing keys.
+- Production uses two Secrets Manager secrets to separate API access from encryption of endpoint signing keys. Development adds one disposable secret for its validation receiver.
 - Destination signing keys use AES-256-GCM at rest. Do not replace the master key without migrating existing ciphertext.
 - Public recipients must use HTTPS/443. DNS is revalidated on each attempt; all returned addresses must be public. The socket connects to the validated IP with TLS hostname verification. Redirects are not followed.
 - The exact loopback receiver exception exists only in the local runtime.

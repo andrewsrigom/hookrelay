@@ -91,6 +91,21 @@ describe('event acceptance', () => {
     expect(JSON.stringify(stored)).not.toContain(result.signingSecret);
     expect(result.endpoint).not.toHaveProperty('encryptedSecret');
   });
+  it('accepts a caller-supplied signing secret and stores only ciphertext', async () => {
+    const h = setup();
+    const signingSecret = 'whsec_test_supplied_secret_1234567890';
+    const result = await h.relay.createEndpoint({
+      name: 'Managed secret endpoint',
+      url: 'https://example.com/hook',
+      eventTypes: ['order.confirmed'],
+      signingSecret,
+    });
+    const stored = await h.store.get<Endpoint>(kinds.endpoint, result.endpoint.id);
+
+    expect(result.signingSecret).toBe(signingSecret);
+    expect(JSON.stringify(stored)).not.toContain(signingSecret);
+  });
+
   it('enforces the workspace size even when registrations race', async () => {
     const h = setup();
 

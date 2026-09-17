@@ -74,9 +74,17 @@ export class HookRelayStack extends Stack {
       secretName: `${this.stackName}/api-key`,
       generateSecretString: { passwordLength: 48, excludePunctuation: true },
     });
+    const validationReceiverSecret = retainData
+      ? undefined
+      : new secrets.Secret(this, 'ValidationReceiverSecret', {
+          secretName: `${this.stackName}/validation-receiver-signing-key`,
+          generateSecretString: { passwordLength: 48, excludePunctuation: true },
+        });
+
     // Production retains encryption material with its data. Development is disposable.
     masterKey.applyRemovalPolicy(dataRemovalPolicy);
     apiKey.applyRemovalPolicy(dataRemovalPolicy);
+    validationReceiverSecret?.applyRemovalPolicy(dataRemovalPolicy);
     const createFunction = (
       name: string,
       entry: string,
@@ -116,6 +124,11 @@ export class HookRelayStack extends Stack {
       DELIVERY_QUEUE_URL: deliveries.queueUrl,
       FAILED_QUEUE_URL: failedDeliveries.queueUrl,
     });
+    const validationReceiver = validationReceiverSecret
+      ? createFunction('ValidationReceiver', 'apps/aws/validation-receiver.ts', 10, {
+          SIGNING_SECRET_ARN: validationReceiverSecret.secretArn,
+        })
+      : undefined;
 
     for (const fn of [api, worker]) {
       table.grant(
@@ -129,6 +142,10 @@ export class HookRelayStack extends Stack {
     }
 
     apiKey.grantRead(api);
+    if (validationReceiver && validationReceiverSecret) {
+      validationReceiverSecret.grantRead(validationReceiver);
+    }
+
     deliveries.grantSendMessages(dispatcher);
     failedDeliveries.grantSendMessages(dispatcher);
     dispatcher.addEventSource(
@@ -177,6 +194,40 @@ export class HookRelayStack extends Stack {
       }),
     };
 
+    let validationReceiverUrl: string | undefined;
+
+    if (validationReceiver && validationReceiverSecret) {
+      const receiverApi = new gateway.HttpApi(this, 'ValidationReceiverApi', {
+        apiName: 'HookRelay validation receiver',
+      });
+      receiverApi.addRoutes({
+        path: '/webhooks/hookrelay',
+        methods: [gateway.HttpMethod.POST],
+        integration: new integrations.HttpLambdaIntegration(
+          'ValidationReceiverIntegration',
+          validationReceiver,
+        ),
+      });
+
+      const receiverStage = receiverApi.defaultStage!.node.defaultChild as gateway.CfnStage;
+      receiverStage.defaultRouteSettings = { throttlingRateLimit: 5, throttlingBurstLimit: 10 };
+
+      const receiverAccessLogs = new logs.LogGroup(this, 'ValidationReceiverAccessLogs', {
+        retention: logRetention,
+      });
+      receiverAccessLogs.applyRemovalPolicy(dataRemovalPolicy);
+      receiverStage.accessLogSettings = {
+        destinationArn: receiverAccessLogs.logGroupArn,
+        format: JSON.stringify({
+          requestId: '$context.requestId',
+          status: '$context.status',
+          latency: '$context.responseLatency',
+        }),
+      };
+
+      validationReceiverUrl = `${receiverApi.apiEndpoint}/webhooks/hookrelay`;
+    }
+
     // Native queue/HTTP metrics catch failures that partial responses do not count as Lambda errors.
     for (const [name, source] of [
       ['Processing', processingDlq],
@@ -216,5 +267,12 @@ export class HookRelayStack extends Stack {
     new CfnOutput(this, 'DeliveryQueueUrl', { value: deliveries.queueUrl });
     new CfnOutput(this, 'FailedDeliveryQueueUrl', { value: failedDeliveries.queueUrl });
     new CfnOutput(this, 'OutboxFailureQueueUrl', { value: outboxDlq.queueUrl });
+
+    if (validationReceiverUrl && validationReceiverSecret) {
+      new CfnOutput(this, 'ValidationReceiverUrl', { value: validationReceiverUrl });
+      new CfnOutput(this, 'ValidationReceiverSecretArn', {
+        value: validationReceiverSecret.secretArn,
+      });
+    }
   }
 }

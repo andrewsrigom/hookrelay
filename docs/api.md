@@ -22,7 +22,7 @@ curl -sS http://127.0.0.1:4310/api/endpoints \
   -d '{"name":"Fulfillment notifications","url":"http://127.0.0.1:4311/hooks/communications","eventTypes":["fulfillment.shipped"]}'
 ```
 
-This example adds a subscriber for shipment events; the seeded order recipients remain. The response contains `endpoint` and `signingSecret`. Overview responses never expose the encrypted or plaintext secret. Public deployments accept only public HTTPS destinations on port 443. `*` subscribes to every event type.
+This example adds a subscriber for shipment events; the seeded order recipients remain. The response contains `endpoint` and `signingSecret`. Overview responses never expose the encrypted or plaintext secret. A caller that already manages a secret can include a URL-safe `signingSecret` between 32 and 256 characters; otherwise HookRelay generates one. Public deployments accept only public HTTPS destinations on port 443. `*` subscribes to every event type.
 
 ## Publish with an idempotency ID
 
@@ -42,6 +42,7 @@ Content-Type: application/json
 Webhook-Id: dlv_...
 Webhook-Event-Id: evt_...
 Webhook-Endpoint-Id: ep_...
+Webhook-Attempt: <positive integer>
 Webhook-Timestamp: <Unix seconds>
 Webhook-Signature: v1=<hex HMAC>
 ```
@@ -61,7 +62,7 @@ Compute HMAC-SHA256 with the destination signing secret over:
 <timestamp>.<deliveryId>.<original request body bytes>
 ```
 
-Compare in constant time. Reject messages more than five minutes away from your clock. Verify the original body before parsing or changing its JSON representation. Then atomically recognize the delivery ID alongside the business action, and return HTTP 2xx when accepted.
+Compare in constant time. Reject messages more than five minutes away from your clock. Verify the original body before parsing or changing its JSON representation. `Webhook-Attempt` starts at 1 and helps with diagnostics; do not use it as the deduplication key. Then atomically recognize the delivery ID alongside the business action, and return HTTP 2xx when accepted.
 
 The receiver in `apps/receiver/server.ts` verifies this signature and commits one `RECEIVER_EFFECT` record per delivery ID. That record stands in for a downstream business action; a retry with the same ID returns HTTP 200 without adding another record. **Drop first reply** closes the first connection after committing the record, so the retry demonstrates lost-acknowledgement recovery. A real recipient must commit its own business action and delivery ID atomically. If manual replay must not repeat that action, it must also deduplicate by event ID and an appropriate business key.
 

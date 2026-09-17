@@ -20,6 +20,12 @@ export const endpointInput = z
       .array(z.union([eventTypeSchema, z.literal('*')]))
       .min(1)
       .max(20),
+    signingSecret: z
+      .string()
+      .min(32)
+      .max(256)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .optional(),
   })
   .strict();
 

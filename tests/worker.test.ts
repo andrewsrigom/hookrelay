@@ -40,6 +40,7 @@ it('signs the exact body and marks a 2xx delivery completed', async () => {
     string,
     Record<string, string>,
   ];
+  expect(headers['Webhook-Attempt']).toBe('1');
   expect(
     verifyWebhook(
       decryptSecret(stored.encryptedSecret, masterKey),

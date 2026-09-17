@@ -44,6 +44,8 @@ export class RelayService {
 
   async createEndpoint(input: unknown) {
     const parsed = endpointInput.parse(input);
+    const { signingSecret, ...endpointInputValue } = parsed;
+
     await this.deps.validateUrl(parsed.url);
 
     // The counter bounds fan-out and serializes endpoint registration.
@@ -60,9 +62,9 @@ export class RelayService {
       }
 
       const now = this.now();
-      const secret = newSecret();
+      const secret = signingSecret ?? newSecret();
       const endpoint: Endpoint = {
-        ...parsed,
+        ...endpointInputValue,
         id: `ep_${randomUUID()}`,
         version: 1,
         createdAt: now,

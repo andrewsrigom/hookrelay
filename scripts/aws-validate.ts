@@ -10,6 +10,8 @@ const outputsSchema = z.record(
     ApiUrl: z.string().url(),
     ApiKeyArn: z.string().min(1),
     FailedDeliveryQueueUrl: z.string().url(),
+    ValidationReceiverUrl: z.string().url(),
+    ValidationReceiverSecretArn: z.string().min(1),
   }),
 );
 
@@ -38,10 +40,12 @@ const outputs = selectedOutputs;
 const baseUrl = outputs.ApiUrl.replace(/\/$/, '');
 const secretClient = new SecretsManagerClient({});
 const sqsClient = new SQSClient({});
-const secretResult = await secretClient.send(
-  new GetSecretValueCommand({ SecretId: outputs.ApiKeyArn }),
-);
-const apiKey = z.string().min(32).parse(secretResult.SecretString);
+const [apiKeyResult, validationSecretResult] = await Promise.all([
+  secretClient.send(new GetSecretValueCommand({ SecretId: outputs.ApiKeyArn })),
+  secretClient.send(new GetSecretValueCommand({ SecretId: outputs.ValidationReceiverSecretArn })),
+]);
+const apiKey = z.string().min(32).parse(apiKeyResult.SecretString);
+const validationReceiverSecret = z.string().min(32).parse(validationSecretResult.SecretString);
 
 async function request(path: string, init: RequestInit = {}, authenticated = true) {
   return fetch(`${baseUrl}${path}`, {
@@ -214,4 +218,100 @@ try {
   });
 }
 
-console.log('AWS validation passed. The reusable validation endpoint is paused.');
+console.log('PASS controlled terminal failure recorded and its queue artifact removed.');
+
+async function publishValidationEvent(type: string) {
+  const eventId = `evt_${type.replaceAll('.', '_')}_${Date.now()}`;
+  const published = await jsonRequest<{ event: { deliveryIds: string[] } }>('/api/events', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: eventId,
+      type,
+      data: { source: 'aws-validate' },
+    }),
+  });
+
+  assert.equal(published.event.deliveryIds.length, 1);
+  return published.event.deliveryIds[0]!;
+}
+
+async function waitForTerminalDelivery(deliveryId: string) {
+  const deadline = Date.now() + 60_000;
+
+  while (Date.now() < deadline) {
+    const result = await jsonRequest<{
+      delivery: { status: string; attemptCount: number };
+      attempts: Array<{ number: number; statusCode?: number }>;
+    }>(`/api/deliveries/${deliveryId}`);
+
+    if (result.delivery.status === 'delivered' || result.delivery.status === 'failed') {
+      return result;
+    }
+
+    await delay(1_000);
+  }
+
+  throw new Error(`Delivery ${deliveryId} did not reach a terminal state.`);
+}
+
+const receiverOverview = await jsonRequest<{ endpoints: unknown[] }>('/api/overview');
+const receiverEndpoints = z.array(endpointSchema).parse(receiverOverview.endpoints);
+let receiverEndpoint = receiverEndpoints.find(
+  (candidate) =>
+    candidate.name === 'AWS signed receiver validation' &&
+    candidate.url === outputs.ValidationReceiverUrl,
+);
+
+if (receiverEndpoint) {
+  if (!receiverEndpoint.active) {
+    await jsonRequest(`/api/endpoints/${receiverEndpoint.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active: true }),
+    });
+  }
+} else {
+  const created = await jsonRequest<{ endpoint: z.infer<typeof endpointSchema> }>(
+    '/api/endpoints',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'AWS signed receiver validation',
+        url: outputs.ValidationReceiverUrl,
+        eventTypes: ['hookrelay.cloud_success', 'hookrelay.cloud_retry'],
+        signingSecret: validationReceiverSecret,
+      }),
+    },
+  );
+  receiverEndpoint = endpointSchema.parse(created.endpoint);
+}
+
+try {
+  const successId = await publishValidationEvent('hookrelay.cloud_success');
+  const success = await waitForTerminalDelivery(successId);
+
+  assert.equal(success.delivery.status, 'delivered');
+  assert.equal(success.delivery.attemptCount, 1);
+  assert.deepEqual(
+    success.attempts.map((attempt) => attempt.statusCode),
+    [200],
+  );
+  console.log('PASS signed HTTPS delivery accepted on the first attempt.');
+
+  const retryId = await publishValidationEvent('hookrelay.cloud_retry');
+  const retry = await waitForTerminalDelivery(retryId);
+
+  assert.equal(retry.delivery.status, 'delivered');
+  assert.equal(retry.delivery.attemptCount, 2);
+  assert.deepEqual(
+    retry.attempts.map((attempt) => attempt.statusCode),
+    [503, 200],
+  );
+  console.log('PASS signed HTTPS delivery recovered from 503 to 200.');
+} finally {
+  await jsonRequest(`/api/endpoints/${receiverEndpoint.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ active: false }),
+  });
+}
+
+console.log('AWS validation passed. Reusable validation endpoints are paused.');

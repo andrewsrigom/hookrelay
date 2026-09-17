@@ -4,7 +4,12 @@ import { build } from 'esbuild';
 await buildWeb();
 
 await build({
-  entryPoints: ['apps/aws/api.ts', 'apps/aws/worker.ts', 'apps/aws/dispatcher.ts'],
+  entryPoints: [
+    'apps/aws/api.ts',
+    'apps/aws/worker.ts',
+    'apps/aws/dispatcher.ts',
+    'apps/aws/validation-receiver.ts',
+  ],
   outdir: 'dist/lambda',
   bundle: true,
   platform: 'node',
