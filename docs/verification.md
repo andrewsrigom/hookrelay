@@ -1,16 +1,17 @@
 # Verification
 
-Local checks ran on 2026-09-15 in Ubuntu 20.04 WSL with Node.js 24.19.0 and pnpm 10.32.0.
+Checks ran on 2026-09-16 in Ubuntu 20.04 WSL with Node.js 24.19.0 and pnpm 10.32.0.
 
-| Check                                | Result                                                                                                                                                                              |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check`                         | TypeScript, ESLint, and 61 unit, contract, storage, and HTTP tests passed.                                                                                                          |
-| `pnpm format:check` and `pnpm build` | Formatting passed; the dashboard and three Lambda entry points bundled.                                                                                                             |
-| `pnpm test:flow`                     | Real loopback HTTP covered signatures, retries, terminal failure, replay, lost acknowledgement, and recovery after restart.                                                         |
-| `pnpm test:integration`              | Five tests passed through the AWS SDK against DynamoDB Local 3.3.1.                                                                                                                 |
-| `pnpm synth` and `pnpm verify:synth` | CDK generated a template with three Lambdas, four encrypted queues, two secrets, partial batch failures, and scoped IAM actions.                                                    |
-| Browser                              | Chromium covered publication, response changes, delivery inspection, and replay. Axe found no violations in the tested desktop overview, mobile overview, or delivery detail views. |
-| `pnpm dev:fresh`                     | A separate run started with three endpoints, empty history, and its own SQLite database and key.                                                                                    |
+| Check                                     | Result                                                                                                                                                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check`                              | TypeScript, ESLint, and 61 unit, contract, storage, and HTTP tests passed.                                                                                                                                       |
+| `pnpm format:check` and `pnpm build`      | Formatting passed; the dashboard and three Lambda entry points bundled.                                                                                                                                          |
+| `pnpm test:flow`                          | Real loopback HTTP covered signatures, retries, terminal failure, replay, lost acknowledgement, and recovery after restart.                                                                                      |
+| `pnpm test:integration`                   | Five tests passed through the AWS SDK against DynamoDB Local 3.3.1.                                                                                                                                              |
+| `pnpm synth` and `pnpm verify:synth`      | CDK generated a template with three Lambdas, four encrypted queues, two project-named secrets, partial batch failures, on-demand DynamoDB, scoped IAM actions, and no NAT Gateway, OpenSearch, or RDS resources. |
+| `AWS_PROFILE=hookrelay pnpm aws:validate` | The deployed dev stack passed API authentication and the DynamoDB Streams to dispatcher to SQS to worker path, including outbound HTTPS and terminal delivery recording.                                         |
+| Browser                                   | Chromium covered publication, response changes, delivery inspection, and replay. Axe found no violations in the tested desktop overview, mobile overview, or delivery detail views.                              |
+| `pnpm dev:fresh`                          | A separate run started with three endpoints, empty history, and its own SQLite database and key.                                                                                                                 |
 
 ## Order flow
 
@@ -22,6 +23,6 @@ The dashboard image shows the original order deliveries; the mobile image was ca
 
 ## Validation limits
 
-- No AWS resources have been deployed. Managed Streams, SQS, Lambda, Secrets Manager, IAM, and alarms still need a cloud integration run.
-- DynamoDB tests use fake credentials and a loopback endpoint. The SDK retry test stubs its HTTP recipient; `pnpm test:flow` covers real local HTTP.
-- SQS dispatcher tests mock SDK responses. The cloud dashboard and outbox repair command have not been exercised against an AWS account.
+- The managed-path validation uses a controlled HTTP 401 as its terminal result. A successful delivery to an independently hosted signed receiver still needs a cloud acceptance run.
+- Retry timing, DLQ redrive, alarm state changes, and the outbox repair command have not been exercised in the AWS account. Their local logic and synthesized resources are covered separately.
+- The dashboard remains a local application; cloud frontend hosting is outside this release.

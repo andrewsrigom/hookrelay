@@ -52,6 +52,9 @@ pnpm test:flow             # Signed local HTTP, retries, failure, and replay (~9
 pnpm build                 # Dashboard and Lambda entry points
 pnpm synth                 # Generate CloudFormation without deploying
 pnpm verify:synth
+
+# Requires a deployed dev stack and the local AWS profile
+AWS_PROFILE=hookrelay pnpm aws:validate
 ```
 
 Optional DynamoDB SDK integration on **Linux x64** requires `tar` and network access for the first setup:
@@ -86,4 +89,4 @@ Runtime secrets, local data, AWS CLI files, CDK context, and generated deploymen
 
 ## Current scope
 
-This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend is defined and can be synthesized, but no AWS resources have been deployed. The dashboard is hosted locally; cloud frontend hosting is a separate step. Managed SQS, Streams, Secrets Manager, IAM, and CloudWatch behavior still needs an AWS integration run. Development deployments delete their table and secrets with the stack; `stage=production` retains them and enables deletion protection.
+This release operates one workspace with up to 20 endpoints. It has no operator identities, retention policy, pagination beyond the overview limits, or production-volume validation. The AWS backend has been deployed and its managed delivery path validated in a development account. The dashboard is hosted locally; cloud frontend hosting is a separate step. An independently hosted signed receiver, DLQ redrive, and alarm state transitions still need cloud acceptance runs. Development deployments delete their table and secrets with the stack; `stage=production` retains them and enables deletion protection.

@@ -12,5 +12,8 @@ const deploymentStage = stageValue === 'production' ? 'production' : 'dev';
 
 new HookRelayStack(app, 'HookRelay', {
   deploymentStage,
+  stackName: `HookRelay-${deploymentStage}`,
+  description: 'Reliable webhook delivery backend for commerce events.',
+  terminationProtection: deploymentStage === 'production',
   synthesizer: new DefaultStackSynthesizer({ qualifier: 'hrelaydev' }),
 });

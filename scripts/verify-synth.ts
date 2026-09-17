@@ -29,11 +29,16 @@ const secrets = resources.filter((r) => r.Type === 'AWS::SecretsManager::Secret'
 assert.equal(secrets.length, 2);
 assert(secrets.every((secret) => secret.DeletionPolicy === 'Delete'));
 assert(secrets.every((secret) => secret.UpdateReplacePolicy === 'Delete'));
+assert.deepEqual(
+  new Set(secrets.map((secret) => secret.Properties?.['Name'])),
+  new Set(['HookRelay-dev/api-key', 'HookRelay-dev/signing-encryption-key']),
+);
 
 const table = resources.find((r) => r.Type === 'AWS::DynamoDB::Table');
 assert(table);
 assert.equal(table.DeletionPolicy, 'Delete');
 assert.equal(table.UpdateReplacePolicy, 'Delete');
+assert.equal(table.Properties?.['BillingMode'], 'PAY_PER_REQUEST');
 assert.equal(table.Properties?.['DeletionProtectionEnabled'], false);
 assert.equal(
   (table.Properties?.['PointInTimeRecoverySpecification'] as Record<string, unknown>)?.[
@@ -47,6 +52,22 @@ const mappings = resources.filter((r) => r.Type === 'AWS::Lambda::EventSourceMap
 assert.equal(mappings.length, 2);
 
 assert(mappings.every((r) => JSON.stringify(r.Properties).includes('ReportBatchItemFailures')));
+
+const logGroups = resources.filter((r) => r.Type === 'AWS::Logs::LogGroup');
+
+assert.equal(logGroups.length, 4);
+assert(logGroups.every((logGroup) => logGroup.DeletionPolicy === 'Delete'));
+assert(logGroups.every((logGroup) => logGroup.UpdateReplacePolicy === 'Delete'));
+assert(logGroups.every((logGroup) => logGroup.Properties?.['RetentionInDays'] === 7));
+
+const unexpectedCostResources = new Set([
+  'AWS::EC2::NatGateway',
+  'AWS::OpenSearchService::Domain',
+  'AWS::RDS::DBCluster',
+  'AWS::RDS::DBInstance',
+]);
+
+assert(resources.every((resource) => !unexpectedCostResources.has(resource.Type)));
 
 assert(JSON.stringify(table.Properties).includes('NEW_IMAGE'));
 assert.equal(template.Outputs['DeploymentStage']?.Value, 'dev');
@@ -65,5 +86,5 @@ for (const resource of resources.filter((r) => r.Type === 'AWS::IAM::Policy')) {
 }
 
 console.log(
-  'Verified: disposable dev data, 3 Lambdas, 4 encrypted queues, stream outbox, partial failures, 2 secrets, scoped IAM actions.',
+  'Verified: disposable dev data and logs, 3 Lambdas, 4 encrypted queues, stream outbox, partial failures, 2 secrets, on-demand DynamoDB, scoped IAM actions, and no high-cost network or database resources.',
 );

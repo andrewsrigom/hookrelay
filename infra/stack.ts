@@ -29,6 +29,8 @@ export class HookRelayStack extends Stack {
     super(scope, id, props);
     const retainData = props.deploymentStage === 'production';
     const dataRemovalPolicy = retainData ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY;
+    const logRetention = retainData ? logs.RetentionDays.ONE_MONTH : logs.RetentionDays.ONE_WEEK;
+
     Tags.of(this).add('Project', 'HookRelay');
     Tags.of(this).add('Environment', props.deploymentStage);
 
@@ -65,9 +67,11 @@ export class HookRelayStack extends Stack {
       deadLetterQueue: { queue: processingDlq, maxReceiveCount: policy.maxInfrastructureReceives },
     });
     const masterKey = new secrets.Secret(this, 'SigningEncryptionKey', {
+      secretName: `${this.stackName}/signing-encryption-key`,
       generateSecretString: { passwordLength: 48, excludePunctuation: true },
     });
     const apiKey = new secrets.Secret(this, 'ApiKey', {
+      secretName: `${this.stackName}/api-key`,
       generateSecretString: { passwordLength: 48, excludePunctuation: true },
     });
     // Production retains encryption material with its data. Development is disposable.
@@ -78,8 +82,13 @@ export class HookRelayStack extends Stack {
       entry: string,
       timeout: number,
       environment: Record<string, string>,
-    ) =>
-      new nodejs.NodejsFunction(this, name, {
+    ) => {
+      const logGroup = new logs.LogGroup(this, `${name}Logs`, {
+        retention: logRetention,
+      });
+      logGroup.applyRemovalPolicy(dataRemovalPolicy);
+
+      return new nodejs.NodejsFunction(this, name, {
         entry: resolve(entry),
         handler: 'handler',
         projectRoot: resolve('.'),
@@ -88,12 +97,12 @@ export class HookRelayStack extends Stack {
         architecture: lambda.Architecture.ARM_64,
         memorySize: 512,
         timeout: Duration.seconds(timeout),
-        logGroup: new logs.LogGroup(this, `${name}Logs`, {
-          retention: logs.RetentionDays.ONE_MONTH,
-        }),
+        logGroup,
         bundling: { target: 'node22', minify: true, sourceMap: true, externalModules: [] },
         environment,
       });
+    };
+
     const api = createFunction('Api', 'apps/aws/api.ts', 15, {
       TABLE_NAME: table.tableName,
       MASTER_KEY_ARN: masterKey.secretArn,
@@ -155,8 +164,10 @@ export class HookRelayStack extends Stack {
     const stage = httpApi.defaultStage!.node.defaultChild as gateway.CfnStage;
     stage.defaultRouteSettings = { throttlingRateLimit: 20, throttlingBurstLimit: 40 };
     const apiLogs = new logs.LogGroup(this, 'AccessLogs', {
-      retention: logs.RetentionDays.ONE_MONTH,
+      retention: logRetention,
     });
+    apiLogs.applyRemovalPolicy(dataRemovalPolicy);
+
     stage.accessLogSettings = {
       destinationArn: apiLogs.logGroupArn,
       format: JSON.stringify({

@@ -26,6 +26,7 @@
     "synth": "pnpm cdk synth --quiet",
     "verify:synth": "tsx scripts/verify-synth.ts",
     "local:setup": "tsx scripts/setup-local-tools.ts",
+    "aws:validate": "tsx scripts/aws-validate.ts",
     "aws:smoke": "tsx scripts/aws-smoke.ts",
     "aws:repair-outbox": "tsx scripts/repair-outbox.ts"
   },

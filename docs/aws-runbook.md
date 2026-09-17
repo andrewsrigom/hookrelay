@@ -1,6 +1,6 @@
 # AWS deployment and operations
 
-The CDK stack defines the backend. It has been synthesized and inspected locally; it has not been deployed or validated in an AWS account. Use a development account for the first run.
+The CDK stack defines the backend. The development stack has been deployed and validated in AWS; use a separate development account and review the diff before each update.
 
 ## Keep account data out of Git
 
@@ -46,7 +46,9 @@ AWS_PROFILE=hookrelay pnpm cdk diff HookRelay -c stage=dev
 AWS_PROFILE=hookrelay pnpm cdk deploy HookRelay -c stage=dev
 ```
 
-`stage=dev` is disposable: DynamoDB point-in-time recovery and deletion protection are off, and the table and secrets are deleted with the stack. `stage=production` retains them and enables both protections. Do not switch an existing stack between these modes without reviewing the CDK diff. Deployment commands create cloud resources and may incur charges; local commands do not.
+`stage=dev` is disposable: DynamoDB point-in-time recovery and deletion protection are off, and the table and secrets are deleted with the stack. The secrets use names under `HookRelay-dev/` so the project role can read only project-owned values. `stage=production` retains them and enables both protections. Do not switch an existing stack between these modes without reviewing the CDK diff. Deployment commands create cloud resources and may incur charges; local commands do not.
+
+The logical CDK stack ID remains `HookRelay`; its physical name is `HookRelay-dev` or `HookRelay-production`. Production also enables CloudFormation termination protection. Development log groups retain seven days of data and are deleted with the stack. Production log groups retain one month and remain available after stack removal.
 
 ## Credentials and first request
 
@@ -78,6 +80,14 @@ pnpm aws:smoke
 ```
 
 The command publishes synthetic data, follows the matching delivery for up to two minutes, and never prints the API key or signing secret.
+
+To validate the managed path without an external receiver, run:
+
+```bash
+AWS_PROFILE=hookrelay pnpm aws:validate
+```
+
+This command loads the API key into memory, checks the authentication boundary, creates or reuses a paused validation endpoint, and publishes one synthetic event. The endpoint targets HookRelay's protected overview route, so the expected HTTP 401 proves that DynamoDB Streams, the dispatcher, SQS, the worker, outbound HTTPS, and terminal delivery recording all ran. It removes only terminal queue messages whose delivery belongs to a synthetic validation event, then pauses the endpoint before it exits. The operator identity therefore needs Secrets Manager read access for the API key and receive/delete access to the output failure queue.
 
 ## Cloud acceptance checks
 
@@ -120,6 +130,6 @@ AWS_PROFILE=hookrelay pnpm cdk destroy HookRelay -c stage=dev
 
 The development stack deletes its DynamoDB table and both secrets. The separate `CDKToolkit-HookRelay` bootstrap stack remains for later CDK deployments; inspect it before removing it, especially if another project uses it. A production deployment retains its table and secrets after stack removal and requires deliberate cleanup.
 
-Queue retention is four days for pending deliveries and fourteen days for the failure queues; logs retain one month. Automatic DynamoDB history/outbox cleanup is not implemented.
+Queue retention is four days for pending deliveries and fourteen days for the failure queues. Development logs retain seven days and are removed with the stack; production logs retain one month. Automatic DynamoDB history/outbox cleanup is not implemented.
 
 Do not replace the signing-encryption master key while existing endpoint ciphertext depends on it. A rotation requires a migration or a versioned keyring. API keys are cached for up to five minutes in warm Lambda instances.
