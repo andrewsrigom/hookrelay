@@ -42,12 +42,16 @@ export const handler: APIGatewayProxyHandlerV2 = async (event) => {
     const store = awsStore();
     const urls = new UrlPolicy();
     const relay = new RelayService({ store, masterKey, validateUrl: (url) => urls.validate(url) });
-    const result = await createRouter({ store, relay, apiKey })({
+    const router = createRouter({ store, relay, apiKey });
+
+    const request = {
       method: event.requestContext.http.method,
       path: event.rawPath,
       body,
       authorization: event.headers.authorization,
-    });
+    };
+
+    const result = await router(request);
 
     return { statusCode: result.statusCode, headers, body: JSON.stringify(result.body) };
   } catch (error) {
